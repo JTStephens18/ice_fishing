@@ -1,36 +1,43 @@
-# Tech Stack & Architecture Overview
+# Project Architecture Guide
 
 ## Tech Stack
 - **Core:** React, TypeScript, Vite.
 - **3D Engine:** React Three Fiber (R3F) / Three.js.
-- **State Management:** Zustand (External store).
+- **State Management:** Zustand (Split Stores).
 - **UI/Debug:** Leva (Tweakpane).
 
 ---
 
 ## Architectural Patterns
 
-### 1. State Management (The "Brain")
-- **Pattern:** "Smart Store" / Flux-like.
-- **Rule:** All game logic, rules, RNG, and state transitions must reside in `useGameStore` actions.
-- **Constraint:** UI components (Leva) and 3D meshes (R3F) must call the exact same store actions to ensure consistent behavior.
-> **Avoid:** Do not write game logic (e.g., "Check if caught fish") inside React Event Handlers (`onClick`).
+### 1. State Management (Split Domain Stores)
+- **Pattern:** "Global World" vs. "Local Mechanics."
+- **Global Store (`gameStore.ts`):** Handles the "Universe Rules" (Time, Environment, Sanity, Win/Loss). This is the Single Source of Truth for the game loop.
+- **Mechanic Stores (`fishingStore.ts`, etc.):** Handle isolated gameplay systems (Rod physics, specific inventory, mini-game states).
 
-### 2. 3D Components (The "Body")
-- **Pattern:** Reactive / "Dumb" View.
-- **Rule:** Components render based on read-only state from the store.
-- **Interactivity:** `onClick` events should only fire Store Actions (e.g., `castLine()`).
-- **Visuals:** Use `useEffect` or `useFrame` to subscribe to state changes for imperative animations (Sound, Particles, Rod Bending) that bridge the "Ref Gap."
+### 2. Cross-Store Communication
+- **Rule:** Stores should remain decoupled where possible.
+- **Dependency Direction:** Mechanic stores may depend on the Global store, but the Global store should not depend on Mechanic stores.
+- **Implementation:** To read or modify global state from a mechanic action, use `useGameStore.getState()` directly.
+> **Example:** `fishingStore` calls `useGameStore.getState().triggerViolation()` if a rule is broken.
 
-### 3. Debugging (Leva)
-- **Rule:** Use `useControls` with named folders (e.g., `useControls('Folder', ...)`).
-- **Syncing:** Debug controls must sync with the store manually via `useEffect` if the game logic updates state internally.
+### 3. Logic & Components
+- **Smart Actions:** Logic remains in the stores (not components). Components trigger actions like `castLine()`.
+- **Selective Subscription:** Components should import only the specific store hook they need (e.g., `FishingRod.tsx` only imports `useFishingStore`).
+- **Visual Bridge:** Components use `useEffect` to subscribe to store changes for imperative visuals (animations, sounds).
+
+### 4. Debugging (Leva)
+- **Rule:** The Debug component (`DebugInterface.tsx`) is the exception to the separation rule; it imports all stores to visualize the entire system state.
+- **Syncing:** Use separate `useControls` folders for each store domain.
 
 ---
 
-## Key Types (Reference)
+## Key Store Roles
 
-```typescript
-type GamePhase = 'MENU' | 'PLAYING' | 'ENDING_GOOD' | 'ENDING_BAD' ...
-type FishingPhase = 'IDLE' | 'CASTING' | 'WAITING' | 'BITE' | 'REELING'
-type HeaterMode = 'ORANGE' | 'BLUE'
+### Global Store (`useGameStore`)
+- **State:** `GamePhase`, `CurrentHour`, `Sanity`, `HeaterMode`, `isWaterStill`.
+- **Responsibility:** Managing the simulation clock, environment safety, and win/loss triggers.
+
+### Fishing Store (`useFishingStore`)
+- **State:** `FishingPhase`, `CurrentCatch`, `BaitCount`.
+- **Responsibility:** Rod state machine (`IDLE` -> `CASTING` -> `BITE`), loot RNG, and validating actions against Global Rules via `getState()`.
