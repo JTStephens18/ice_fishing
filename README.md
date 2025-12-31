@@ -1,73 +1,36 @@
-# React + TypeScript + Vite
+# Tech Stack & Architecture Overview
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Tech Stack
+- **Core:** React, TypeScript, Vite.
+- **3D Engine:** React Three Fiber (R3F) / Three.js.
+- **State Management:** Zustand (External store).
+- **UI/Debug:** Leva (Tweakpane).
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Architectural Patterns
 
-## React Compiler
+### 1. State Management (The "Brain")
+- **Pattern:** "Smart Store" / Flux-like.
+- **Rule:** All game logic, rules, RNG, and state transitions must reside in `useGameStore` actions.
+- **Constraint:** UI components (Leva) and 3D meshes (R3F) must call the exact same store actions to ensure consistent behavior.
+> **Avoid:** Do not write game logic (e.g., "Check if caught fish") inside React Event Handlers (`onClick`).
 
-The React Compiler is currently not compatible with SWC. See [this issue](https://github.com/vitejs/vite-plugin-react/issues/428) for tracking the progress.
+### 2. 3D Components (The "Body")
+- **Pattern:** Reactive / "Dumb" View.
+- **Rule:** Components render based on read-only state from the store.
+- **Interactivity:** `onClick` events should only fire Store Actions (e.g., `castLine()`).
+- **Visuals:** Use `useEffect` or `useFrame` to subscribe to state changes for imperative animations (Sound, Particles, Rod Bending) that bridge the "Ref Gap."
 
-## Expanding the ESLint configuration
+### 3. Debugging (Leva)
+- **Rule:** Use `useControls` with named folders (e.g., `useControls('Folder', ...)`).
+- **Syncing:** Debug controls must sync with the store manually via `useEffect` if the game logic updates state internally.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+---
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Key Types (Reference)
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+```typescript
+type GamePhase = 'MENU' | 'PLAYING' | 'ENDING_GOOD' | 'ENDING_BAD' ...
+type FishingPhase = 'IDLE' | 'CASTING' | 'WAITING' | 'BITE' | 'REELING'
+type HeaterMode = 'ORANGE' | 'BLUE'
